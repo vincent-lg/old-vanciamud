@@ -39,7 +39,7 @@ SERVERNAME = "Avenew One"
 
 ## Commands
 # UnloggedinCmdSet
-#CMDSET_UNLOGGEDIN = "commands.unloggedin.UnloggedinCmdSet"
+CMDSET_UNLOGGEDIN = "commands.menu.UnloggedinCmdSet"
 DELAY_CMD_LOGINSTART = 0
 
 # Default prefix
