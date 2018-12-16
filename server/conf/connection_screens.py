@@ -18,16 +18,14 @@ screen is read and displayed by the unlogged-in "look" command.
 from django.conf import settings
 from evennia import utils
 
-CONNECTION_SCREEN = """
-|b==============================================================|n
- Welcome to |g{}|n, version {}!
+CONNECTION_SCREEN = r"""
+Bienvenue sur l'ancien
+  __     __               _       __  __ _   _ ____
+  \ \   / /_ _ _ __   ___(_) __ _|  \/  | | | |  _ \
+   \ \ / / _` | '_ \ / __| |/ _` | |\/| | | | | | | |
+    \ V / (_| | | | | (__| | (_| | |  | | |_| | |_| |
+     \_/ \__,_|_| |_|\___|_|\__,_|_|  |_|\___/|____/
 
- If you have an existing account, connect to it by typing:
-      |wconnect <username> <password>|n
- If you need to create an account, type (without the <>'s):
-      |wcreate <username> <password>|n
 
- If you have spaces in your username, enclose it in quotes.
- Enter |whelp|n for more info. |wlook|n will re-show this screen.
-|b==============================================================|n""" \
-    .format(settings.SERVERNAME, utils.get_evennia_version())
+                                        Basé sur |gEvennia {}|n""" \
+    .format(utils.get_evennia_version())

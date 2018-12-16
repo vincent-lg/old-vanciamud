@@ -40,8 +40,9 @@ def start(caller):
     text += "\n\n" + dedent("""
             Si vous aviez un compte enregistré sur l'ancien Vancia et souhaitez
             récupérer le nom d'un de ses personnages, entrez son nom ci-dessous.
+            |rNotez qu'il s'agit bien du nom du personnage, pas du nom du compte.|n
 
-            Entrez votre nom de compte ou |yNOUVEAU|n pour en créer un.
+            Entrez votre nom d'utilisateur ou |yNOUVEAU|n pour en créer un.
         """).strip()
     options = (
         {
@@ -219,7 +220,7 @@ def ask_password(caller, string_input):
         string = dedent("""
             |rVous avez été banni(e) et ne pouvez vous connecter.
             Si vous pensez que ce bannissement est une erreur, contactez les administrateurs à
-            equipe@vanciamud.fr
+            admin@vanciamud.fr
         """.strip("\n"))
         caller.sessionhandler.disconnect(caller, string)
         text = ""
@@ -366,7 +367,7 @@ def create_password(caller, string_input):
             # won't see any errors at all.
             caller.msg(dedent("""
                 |rUne erreur inattendue s'est produite..|n  S'il vous plaît, envoyez un e-mail
-                à equipe@vanciamud.fr pour signaler ce problème.
+                à admin@vanciamud.fr pour signaler ce problème.
             """.strip("\n")))
             logger.log_trace()
         else:
