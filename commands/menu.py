@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """The login menu."""
 
 import re
@@ -19,7 +21,7 @@ RE_VALID_USERNAME = re.compile(r"^[a-z]{3,}$", re.I)
 LEN_PASSWD = 6
 CONNECTION_SCREEN_MODULE = settings.CONNECTION_SCREEN_MODULE
 
-# Menu notes (top-level functions)
+# Menu nodes (top-level functions)
 
 
 def start(caller):
@@ -33,16 +35,26 @@ def start(caller):
 
     """
     text = random_string_from_module(CONNECTION_SCREEN_MODULE)
-    text += "\n\nEnter your username or |yNEW|n to create a new account."
+    text += "\n\n" + dedent("""
+            Si vous aviez un compte enregistré sur l'ancien Vancia et souhaitez
+            récupérer le nom d'un de ses personnages, entrez son nom ci-dessous.
+
+            Entrez votre nom de compte ou |yNOUVEAU|n pour en créer un.
+        """).strip()
     options = (
-        {"key": "b",
-         "goto": "start"},
-        {"key": "new",
-         "goto": "create_account"},
-        {"key": "quit",
-         "goto": "quit"},
-        {"key": "_default",
-         "goto": "username"})
+        {
+            "key": "nouveau",
+            "goto": "create_account",
+        },
+        {
+            "key": "quit",
+            "goto": "quit",
+        },
+        {
+            "key": "_default",
+            "goto": "username",
+        },
+    )
     return text, options
 
 
@@ -59,25 +71,36 @@ def username(caller, string_input):
     account = managers.accounts.get_account_from_name(string_input)
     if account is None:
         text = dedent("""
-            |rThe username '{}' doesn't exist. Have you created it?|n
-            Try another name or leave empty to go back.
+            |rCe nom d'utilisateur n'existe pas.|n L'avez-vous créé ?
+            Essayez un nouveau nom d'utilisateur existant, ou entrez |yr|n
+            pour revenir à l'écran d'accueil.
         """.strip("\n")).format(string_input)
         options = (
-            {"key": "b",
-             "goto": "start"},
-            {"key": "_default",
-             "goto": "username"})
+            {
+                "key": "r",
+                "goto": "start",
+            },
+            {
+                "key": "_default",
+                "goto": "username",
+            },
+        )
     else:
         caller.ndb._menutree.account = account
-        text = "Enter the password for the {} account.".format(account.name)
+        text = "Entrez le mot de passe pour l'utilisateur {}.".format(account.name)
         # Disables echo for the password
         caller.msg("", options={"echo": False})
         options = (
-            {"key": "b",
-             "exec": lambda caller: caller.msg("", options={"echo": True}),
-             "goto": "start"},
-            {"key": "_default",
-             "goto": "ask_password"})
+            {
+                "key": "r",
+                "exec": lambda caller: caller.msg("", options={"echo": True}),
+                "goto": "start",
+            },
+            {
+                "key": "_default",
+                "goto": "ask_password",
+            },
+        )
 
     return text, options
 
@@ -98,8 +121,7 @@ def ask_password(caller, string_input):
     # Check the password and login is correct; also check for bans
 
     account = menutree.account
-    password_attempts = menutree.password_attempts \
-        if hasattr(menutree, "password_attempts") else 0
+    password_attempts = getattr(menutree, "password_attempts", 0)
     bans = ServerConfig.objects.conf("server_bans")
     banned = bans and (any(tup[0] == account.name.lower() for tup in bans) or
                        any(tup[2].match(caller.address) for tup in bans if tup[2]))
@@ -110,28 +132,33 @@ def ask_password(caller, string_input):
         if password_attempts > 2:
             # Too many tries
             caller.sessionhandler.disconnect(
-                caller, "|rToo many failed attempts. Disconnecting.|n")
+                caller, "|rIl y a eu trop de tentatives de connexion erronnées. Déconnexion...|n")
             text = ""
             options = {}
         else:
             menutree.password_attempts = password_attempts
             text = dedent("""
-                |rIncorrect password.|n
-                Try again or leave empty to go back.
+                |rMot de passe invalide.|n
+                Essayez un autre mot de passe ou entrez |yr|n pour revenir à l'écran d'accueil.
             """.strip("\n"))
             # Loops on the same node
             options = (
-                {"key": "b",
-                 "exec": lambda caller: caller.msg("", options={"echo": True}),
-                 "goto": "start"},
-                {"key": "_default",
-                 "goto": "ask_password"})
+                {
+                    "key": "r",
+                    "exec": lambda caller: caller.msg("", options={"echo": True}),
+                    "goto": "start",
+                },
+                {
+                    "key": "_default",
+                    "goto": "ask_password",
+                },
+            )
     elif banned:
         # This is a banned IP or name!
         string = dedent("""
-            |rYou have been banned and cannot continue from here.
-            If you feel this ban is in error, please email an admin.|n
-            Disconnecting.
+            |rVous avez été banni(e) et ne pouvez vous connecter.
+            Si vous pensez que ce bannissement est une erreur, contactez les administrateurs à
+            equipe@vanciamud.fr
         """.strip("\n"))
         caller.sessionhandler.disconnect(caller, string)
         text = ""
@@ -153,10 +180,13 @@ def create_account(caller):
     The input is redirected to 'create_username'.
 
     """
-    text = "Enter your new account name."
+    text = "Entrez le nom de votre nouvel utilisateur."
     options = (
-        {"key": "_default",
-         "goto": "create_username"},)
+        {
+            "key": "_default",
+            "goto": "create_username",
+        },
+    )
     return text, options
 
 
@@ -174,37 +204,50 @@ def create_username(caller, string_input):
     # If an account with that name exists, a new one will not be created
     if account:
         text = dedent("""
-            |rThe account {} already exists.|n
-            Enter another username or leave blank to go back.
+            |rL'utilisateur {} existe déjà.|n
+            Entrez un autre nom d'utilisateur, ou entrez |yr|n pour revenir à l'écran d'accueil.
         """.strip("\n")).format(string_input)
         # Loops on the same node
         options = (
-            {"key": "b",
-             "goto": "start"},
-            {"key": "_default",
-             "goto": "create_username"})
+            {
+                "key": "r",
+                "goto": "start",
+            },
+            {
+                "key": "_default",
+                "goto": "create_username",
+            },
+        )
     elif not RE_VALID_USERNAME.search(string_input):
         text = dedent("""
-            |rThis username isn't valid.|n
-            Only letters are accepted, without special characters.
-            The username must be at least 3 characters long.
-            Enter another username or leave blank to go back.
+            |rCe nom d'utilisateur n'est pas valide.|n
+            Seules des lettres sont acceptées.
+            Le nom d'utilisateur doit comporter au moins 3 lettres.
+            Entrez un nouveau nom d'utilisateur ou entrez |yr|n pour revenir à l'écran d'accueil.
         """.strip("\n"))
         options = (
-            {"key": "b",
-             "goto": "start"},
-            {"key": "_default",
-             "goto": "create_username"})
+            {
+                "key": "r",
+                "goto": "start",
+            },
+            {
+                "key": "_default",
+                "goto": "create_username",
+            },
+        )
     else:
         # a valid username - continue getting the password
         menutree.accountname = string_input
         # Disables echo for entering password
         caller.msg("", options={"echo": False})
         # Redirects to the creation of a password
-        text = "Enter this account's new password."
+        text = "Entrez le mot de passe de ce nouvel utilisateur."
         options = (
-            {"key": "_default",
-             "goto": "create_password"},)
+            {
+                "key": "_default",
+                "goto": "create_password",
+            },
+        )
 
     return text, options
 
@@ -220,11 +263,16 @@ def create_password(caller, string_input):
     menutree = caller.ndb._menutree
     text = ""
     options = (
-        {"key": "b",
-         "exec": lambda caller: caller.msg("", options={"echo": True}),
-         "goto": "start"},
-        {"key": "_default",
-         "goto": "create_password"})
+        {
+            "key": "r",
+            "exec": lambda caller: caller.msg("", options={"echo": True}),
+            "goto": "start",
+        },
+        {
+            "key": "_default",
+            "goto": "create_password",
+        },
+    )
 
     password = string_input.strip()
     accountname = menutree.accountname
@@ -232,8 +280,8 @@ def create_password(caller, string_input):
     if len(password) < LEN_PASSWD:
         # The password is too short
         text = dedent("""
-            |rYour password must be at least {} characters long.|n
-            Enter another password or leave it empty to go back.
+            |rLe mot de passe doit comporter au moins {} caractères.|n
+            Entrez un nouveau mot de passe ou entrez |yr|n pour revenir à l'écran d'accueil.
         """.strip("\n")).format(LEN_PASSWD)
     else:
         # Everything's OK.  Create the new player account and
@@ -256,14 +304,13 @@ def create_password(caller, string_input):
             # to handle tracebacks ourselves at this point. If we don't, we
             # won't see any errors at all.
             caller.msg(dedent("""
-                |rAn error occurred.|n  Please e-mail an admin if
-                the problem persists. Try another password or leave
-                it empty to go back to the login screen.
+                |rUne erreur inattendue s'est produite..|n  S'il vous plaît, envoyez un e-mail
+                à equipe@vanciamud.fr pour signaler ce problème.
             """.strip("\n")))
             logger.log_trace()
         else:
             text = ""
-            caller.msg("|gWelcome, your new account has been created!|n")
+            caller.msg("|gBienvenue ! Votre nouvel utilisateur a bien été créé.|n")
             caller.msg("", options={"echo": True})
             caller.sessionhandler.login(caller, new_account)
 
@@ -271,7 +318,7 @@ def create_password(caller, string_input):
 
 
 def quit(caller):
-    caller.sessionhandler.disconnect(caller, "Goodbye! Logging off.")
+    caller.sessionhandler.disconnect(caller, "Au revoir ! Déconnexion...")
     return "", {}
 
 # Other functions
