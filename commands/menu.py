@@ -2,6 +2,7 @@
 
 """The login menu."""
 
+import os
 import re
 from textwrap import dedent
 
@@ -15,6 +16,7 @@ from evennia.server.models import ServerConfig
 from evennia import syscmdkeys
 from evennia.utils.evmenu import EvMenu
 from evennia.utils.utils import random_string_from_module
+from web.mailgun.utils import send_email
 
 # Constants
 RE_VALID_USERNAME = re.compile(r"^[a-z]{3,}$", re.I)
@@ -83,6 +85,65 @@ def username(caller, string_input):
             {
                 "key": "_default",
                 "goto": "username",
+            },
+        )
+    elif not account.db.valid and not account.db.sent_validation:
+        # This account isn't valid yet, send an email, update the password
+        # Generate a random password
+        caller.ndb._menutree.account = account
+        length = 6
+        charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+        random_bytes = os.urandom(length)
+        indices = [int(len(charset) * (ord(byte) / 256.0)) for byte in random_bytes]
+        password = "".join([charset[index] for index in indices])
+        account.set_password(password, force=True)
+        send_email("NOREPLY", account.email, "[VanciaMUD] Demande de récupération de l'utilisateur {}".format(account.username), dedent("""
+                Bonjour,
+
+                Une demande de récupération de l'utilisateur {username} a été faite depuis vanciamud.fr.
+                Cet e-mail vous est envoyé car l'utilisateur en question n'a pas été validé.
+                Pour le valider, vous devez entrer dans votre client MUD le mot de passe suivant :
+
+                Mot de passe temporaire : {password}
+
+                Une fois connecté, vous aurez la possibilité de changer ce mot de passe, étape
+                recommandée pour des raisons de sécurité.
+
+                Si cette demande n'a pas été faite par vous, reprenez au plus vite le contrôle
+                de votre utilisateur et changez de mot de passe. Si le problème persiste, vous
+                pouvez également contacter les administrateurs de VanciaMUD, à l'adresse admin@vanciamud.fr .
+
+                À très bientôt,
+
+                L'équipe des administrateurs de VanciaMUD
+        """.format(username=account.username, password=password)).strip(), store=False)
+        account.db.sent_validation = True
+        text = dedent("""
+            Un e-mail de confirmation a été envoyé à l'ancienne adresse e-mail de cet utilisateur.
+            Cet e-mail contient le mot de passe temporaire de l'utilisateur, que vous devez à
+            présent entrer dans votre client MUD. Si vous perdez la connexion, reconnectez-vous
+            en entrant le même nom d'utilisateur. Si votre ancienne adresse e-mail n'est plus
+            valide et que vous ne recevez pas l'e-mail de confirmation, envoyez un e-mail
+            à admin@vanciamud.fr en précisant votre ancienne adresse e-mail à des fins
+            d'identification.
+
+            Entrez le mot de passe temporaire reçu par e-mail :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "check_temporary_password",
+            },
+        )
+    elif not account.db.valid and account.db.sent_validation:
+        caller.ndb._menutree.account = account
+        text = dedent("""
+            Entrez le mot de passe temporaire reçu par e-mail :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "check_temporary_password",
             },
         )
     else:
@@ -320,6 +381,76 @@ def create_password(caller, string_input):
 def quit(caller):
     caller.sessionhandler.disconnect(caller, "Au revoir ! Déconnexion...")
     return "", {}
+
+
+def check_temporary_password(caller, string_input):
+    """Check the temporary password."""
+    menutree = caller.ndb._menutree
+    string_input = string_input.strip()
+    account = menutree.account
+    password_attempts = getattr(menutree, "password_attempts", 0)
+    if not account.check_password(string_input):
+        # Didn't enter a correct password
+        password_attempts += 1
+        if password_attempts > 2:
+            # Too many tries
+            caller.sessionhandler.disconnect(
+                caller, "|rIl y a eu trop de tentatives de connexion erronnées. Déconnexion...|n")
+            text = ""
+            options = {}
+        else:
+            menutree.password_attempts = password_attempts
+            text = dedent("""
+                |rMot de passe invalide.|n
+                Essayez un autre mot de passe ou entrez |yr|n pour revenir à l'écran d'accueil.
+            """.strip("\n"))
+            # Loops on the same node
+            options = (
+                {
+                    "key": "_default",
+                    "goto": "check_temporary_password",
+                },
+            )
+    else:
+        text = dedent("""
+                Mot de passe temporaire valide.
+
+                Changement de mot de passe : entrez un nouveau mot de passe pour cet utilisateur.
+
+                Nouveau mot de passe :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "change_temporary_password",
+            },
+        )
+
+    return text, options
+
+def change_temporary_password(caller, string_input):
+    """Change the temporary password."""
+    menutree = caller.ndb._menutree
+    string_input = string_input.strip()
+    account = menutree.account
+
+    if account.validate_password(string_input):
+        account.set_password(string_input)
+        account.db.valid = True
+        text = ""
+        options = {}
+        caller.msg("", options={"echo": True})
+        caller.sessionhandler.login(caller, account)
+    else:
+        text = "|rCe mot de passe n'est pas valide.|n Entrez un nouveau mot de passe :"
+        options = (
+            {
+                "key": "_default",
+                "goto": "change_temporary_password",
+            },
+        )
+
+    return text, options
 
 # Other functions
 
