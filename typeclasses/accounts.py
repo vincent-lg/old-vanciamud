@@ -24,6 +24,8 @@ several more options for customizing the Guest account system.
 
 from evennia import DefaultAccount, DefaultGuest
 
+from web.mailgun.models import EmailAddress
+
 
 class Account(DefaultAccount):
     """
@@ -91,7 +93,19 @@ class Account(DefaultAccount):
      at_server_shutdown()
 
     """
-    pass
+
+    def record_email_address(self):
+        """
+        Record the account's adress email in the app used by Mailgun.
+
+        This method is automatically called when an account is validated.
+
+        """
+        email, _ = EmailAddress.objects.get_or_create(db_email=self.email)
+        email.db_account = self
+        email.db_display_name = self.key
+        email.save()
+        return email.subscribe_to_news()
 
 
 class Guest(DefaultGuest):
