@@ -26,7 +26,6 @@ class EmailAddress(SharedMemoryModel):
 
     db_display_name = models.CharField(max_length=40, null=True, blank=True, default="")
     db_email = models.CharField(max_length=254, db_index=True, unique=True)
-    db_account = models.OneToOneField(AccountDB, null=True, blank=True, on_delete=models.SET_NULL, related_name="email_address")
 
     def __str__(self):
         if self.db_display_name:

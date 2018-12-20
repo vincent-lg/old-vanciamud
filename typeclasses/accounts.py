@@ -102,7 +102,6 @@ class Account(DefaultAccount):
 
         """
         email, _ = EmailAddress.objects.get_or_create(db_email=self.email)
-        email.db_account = self
         email.db_display_name = self.key
         email.save()
         return email.subscribe_to_news()

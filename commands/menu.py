@@ -4,9 +4,12 @@
 
 import os
 import re
+import string
 from textwrap import dedent
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 from evennia import Command, CmdSet
 from evennia import logger
@@ -88,15 +91,11 @@ def username(caller, string_input):
                 "goto": "username",
             },
         )
-    elif not account.db.valid and not account.db.sent_validation:
+    elif account.email and not any([account.db.valid, account.db.sent_validation, account.db.validation_code]):
         # This account isn't valid yet, send an email, update the password
         # Generate a random password
         caller.ndb._menutree.account = account
-        length = 6
-        charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-        random_bytes = os.urandom(length)
-        indices = [int(len(charset) * (ord(byte) / 256.0)) for byte in random_bytes]
-        password = "".join([charset[index] for index in indices])
+        password = _generate_password(6, string.lowercase + string.digits)
         account.set_password(password, force=True)
         send_email("NOREPLY", account.email, "[VanciaMUD] Demande de récupération de l'utilisateur {}".format(account.username), dedent("""
                 Bonjour,
@@ -225,6 +224,33 @@ def ask_password(caller, string_input):
         caller.sessionhandler.disconnect(caller, string)
         text = ""
         options = {}
+    elif not account.email:
+        text = dedent("""
+            Vous n'avez pas précisé d'adresse e-mail valide pour ce compte. Il vous faut préciser
+            une adresse e-mail valide. Un e-mail vous sera envoyé à cette adresse, contenant un code
+            de validation à 4 chiffres.
+
+            Entrez votre adresse e-mail :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "create_email_address",
+            },
+        )
+    elif account.db.validation_code:
+        text = dedent("""
+            Un code de validaiton à 4 chiffres vous a précédemment été envoyé par e-mail.
+            Veuillez entrer ce code pour valider cet utilisateur.
+
+            Code à 4 chiffres :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "validate_account",
+            },
+        )
     else:
         # We are OK, log us in.
         text = ""
@@ -346,16 +372,15 @@ def create_password(caller, string_input):
             Entrez un nouveau mot de passe ou entrez |yr|n pour revenir à l'écran d'accueil.
         """.strip("\n")).format(LEN_PASSWD)
     else:
-        # Everything's OK.  Create the new player account and
-        # possibly the character, depending on the multisession mode
         from evennia.commands.default import unloggedin
-        # We make use of the helper functions from the default set here.
         try:
             permissions = settings.PERMISSION_ACCOUNT_DEFAULT
             typeclass = settings.BASE_CHARACTER_TYPECLASS
             new_account = unloggedin._create_account(caller, accountname,
                                                      password, permissions)
             if new_account:
+                new_account.email = ""
+                new_account.save()
                 if settings.MULTISESSION_MODE < 2:
                     default_home = ObjectDB.objects.get_id(
                         settings.DEFAULT_HOME)
@@ -371,10 +396,125 @@ def create_password(caller, string_input):
             """.strip("\n")))
             logger.log_trace()
         else:
-            text = ""
-            caller.msg("|gBienvenue ! Votre nouvel utilisateur a bien été créé.|n")
+            menutree.account = new_account
             caller.msg("", options={"echo": True})
-            caller.sessionhandler.login(caller, new_account)
+            text = dedent("""
+                Le nouvel utilisateur a bien été créé.
+
+                Pour l'utiliser, il vous faut préciser une adresse e-mail valide. Un code
+                de validation vous sera envoyé par e-mail. Vous devrez entrer ce code de
+                validation dans votre client pour utiliser ce compte.
+
+                Veuillez entrer une adresse e-mail valide :
+            """).strip()
+            options = (
+                {
+                    "key": "_default",
+                    "goto": "create_email_address",
+                },
+            )
+
+    return text, options
+
+def create_email_address(caller, email_address):
+    """Validate and test the received email address."""
+    menutree = caller.ndb._menutree
+    account = menutree.account
+    text = ""
+    options = (
+        {
+            "key": "_default",
+            "desc": "Enter a valid email address.",
+            "goto": "create_email_address",
+        },
+    )
+
+    email_address = email_address.strip()
+
+    # Try to validate the email address
+    try:
+        validate_email(email_address)
+    except ValidationError:
+        valid = False
+    else:
+        valid = True
+
+    if not valid:
+        # The email address doesn't seem to be valid
+        text = dedent("""
+            |rDésolé, l'adresse e-mail {} ne semble pas valide.|n
+
+            Essayez d'entrer une adresse e-mail de nouveau.
+        """.strip("\n")).format(email_address)
+    else:
+        account.email = email_address
+        account.save()
+
+        # Generates the 4-digit validation code
+        validation_code = _generate_password(4, string.digits)
+        account.db.validation_code = validation_code
+        send_email("NOREPLY", account.email, "[VanciaMUD] Validation de l'utilisateur {}".format(account.username), dedent("""
+                Bonjour,
+
+                Le nouvel utilisateur {username} a été créé sur vanciamud.fr.
+                Cet e-mail vous est envoyé car l'utilisateur en question a précisé cette adresse
+                e-mail. Pour commencer à jouer avec cet utilisateur, il vous suffit d'entrer
+                le code à 4 chiffres suivant :
+
+                Code de validation : {validation_code}
+
+                Si cette demande n'a pas été faite par vous, ignorez simplement ce message,
+                ou contacter un administrateur si d'autres e-mails similaires arrivent dans
+                votre boîte de réception : admin@vanciamud.fr.
+
+                À très bientôt,
+
+                L'équipe des administrateurs de VanciaMUD
+        """.format(username=account.username, validation_code=validation_code)).strip(), store=False)
+        text = dedent("""
+            Un e-mail de confirmation a été envoyé à cette adresse e-mail.
+            Cet e-mail contient le code de validation de l'utilisateur, que vous devez à
+            présent entrer dans votre client MUD. Si vous perdez la connexion, reconnectez-vous
+            en entrant le même nom d'utilisateur.
+
+            Entrez le code de validation à 4 chiffres :
+        """).strip()
+        options = (
+            {
+                "key": "_default",
+                "goto": "validate_account",
+            },
+        )
+
+    return text, options
+
+def validate_account(caller, input):
+    """Prompt the user to enter the received validation code."""
+    text = ""
+    options = (
+        {
+            "key": "_default",
+            "desc": "Enter the validation code.",
+            "goto": "validate_account",
+        },
+    )
+
+    menutree = caller.ndb._menutree
+    account = menutree.account
+    if account.db.validation_code != input.strip():
+        text = dedent("""
+            |rDésolé, le code de validation spécifié {} ne correpsond pas à celui attendu par cet utilisateur.
+            Est-ce bien le code que vous avez reçu par e-mail ? Vous pouvez essayer de
+            l'entrer à nouveau.
+        """.strip("\n")).format(input.strip())
+    else:
+        text = ""
+        options = {}
+        account.db.valid = True
+        account.attributes.remove("validation_code")
+        account.record_email_address()
+        caller.msg("|gBienvenue sur l'ancien VanciaMUD !|n")
+        caller.sessionhandler.login(caller, account)
 
     return text, options
 
@@ -465,6 +605,30 @@ def _formatter(nodetext, optionstext, caller=None):
 
     """
     return nodetext
+
+def _generate_password(length, charset):
+    """
+    Return a randomly-generated password.
+
+    Args:
+        length (int): the length of the password to generate.
+    charset (str, iterable): the charset to generate from.
+
+    Note:
+        The generated password will only contain characters from the charset.
+
+    Returns:
+        password (str): the randomly-generated password.
+
+    Example:
+        >>> import string
+        >>> _generate_password(6, string.lowercase + string.digits)
+        'zf3x97pc'
+
+    """
+    random_bytes = os.urandom(length)
+    indices = [int(len(charset) * (ord(byte) / 256.0)) for byte in random_bytes]
+    return "".join([charset[index] for index in indices])
 
 
 # Commands and CmdSets
