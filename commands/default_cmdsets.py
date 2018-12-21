@@ -15,6 +15,7 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 """
 
 from evennia import default_cmds
+from evennia.commands.default import account
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -33,6 +34,20 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         #
         # any commands you add below will overload the default ones.
         #
+        self.remove(default_cmds.CmdDrop())
+        self.remove(default_cmds.CmdGet())
+        self.remove(default_cmds.CmdGive())
+        self.remove(default_cmds.CmdHome())
+        self.remove(default_cmds.CmdInventory())
+        self.remove(default_cmds.CmdPose())
+        self.remove(default_cmds.CmdSay())
+        self.remove(default_cmds.CmdSetDesc())
+        self.remove(default_cmds.CmdWho())
+        self.remove(default_cmds.CmdWhisper())
+        self.remove(default_cmds.CmdAbout())
+        self.remove(default_cmds.CmdTime())
+        self.remove(default_cmds.CmdAccess())
+        self.remove(default_cmds.CmdNick())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
@@ -49,9 +64,25 @@ class AccountCmdSet(default_cmds.AccountCmdSet):
         Populates the cmdset
         """
         super(AccountCmdSet, self).at_cmdset_creation()
-        #
-        # any commands you add below will overload the default ones.
-        #
+        self.remove(default_cmds.CmdPage())
+        self.remove(default_cmds.CmdCharCreate())
+        self.remove(account.CmdCharDelete())
+        self.remove(default_cmds.CmdQuell())
+        self.remove(default_cmds.CmdIC())
+        self.remove(default_cmds.CmdOOC())
+        self.remove(default_cmds.CmdWho())
+        self.remove(default_cmds.CmdNick())
+        self.remove(default_cmds.CmdChannelCreate())
+        self.remove(default_cmds.CmdCBoot())
+        self.remove(default_cmds.CmdCdesc())
+        self.remove(default_cmds.CmdCdestroy())
+        self.remove(default_cmds.CmdCemit())
+        self.remove(default_cmds.CmdClock())
+        self.remove(default_cmds.CmdCWho())
+        self.remove(default_cmds.CmdAddCom())
+        self.remove(default_cmds.CmdAllCom())
+        self.remove(default_cmds.CmdDelCom())
+        self.remove(default_cmds.CmdChannels())
 
 
 class UnloggedinCmdSet(default_cmds.UnloggedinCmdSet):
