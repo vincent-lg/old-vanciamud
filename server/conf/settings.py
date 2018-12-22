@@ -65,6 +65,27 @@ SCREENREADER_REGEX_STRIP = r"\+-+|\+$|\+~|---+|~~+|==+"
 SEARCH_MULTIMATCH_REGEX = r"(?P<number>[0-9]+)\.(?P<name>.*)"
 SEARCH_MULTIMATCH_TEMPLATE = "  {number}.{name}{aliases}{info}\n"
 
+# Channels
+DEFAULT_CHANNELS = [
+    # public channel
+    {
+        "key": "hrp",
+        "aliases": ('ooc', 'pub', 'public'),
+        "desc": "Canal public des discussions HRP",
+        "locks": "control:perm(Admin);listen:all();send:all()",
+    },
+    # connection/mud info
+    {
+        "key": "info",
+        "aliases": "",
+        "desc": "Canal d'information du MUD",
+        "locks": "control:perm(Developer);listen:perm(Admin);send:false()",
+    },
+]
+
+# Channel options
+CHANNEL_COMMAND_CLASS = "commands.comms.ChannelCommand"
+
 ## Web
 INSTALLED_APPS += (
         "anymail",

@@ -18,6 +18,8 @@ from evennia import default_cmds
 from evennia.commands.default import account
 
 
+from commands.general import CmdAfk, CmdEmote, CmdSay, CmdTell, CmdWho
+
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
     """
     The `CharacterCmdSet` contains general in-game commands like `look`,
@@ -31,9 +33,6 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         Populates the cmdset
         """
         super(CharacterCmdSet, self).at_cmdset_creation()
-        #
-        # any commands you add below will overload the default ones.
-        #
         self.remove(default_cmds.CmdDrop())
         self.remove(default_cmds.CmdGet())
         self.remove(default_cmds.CmdGive())
@@ -48,6 +47,13 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.remove(default_cmds.CmdTime())
         self.remove(default_cmds.CmdAccess())
         self.remove(default_cmds.CmdNick())
+
+        # Add Vancia commands
+        self.add(CmdAfk())
+        self.add(CmdEmote())
+        self.add(CmdSay())
+        self.add(CmdTell())
+        self.add(CmdWho())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
