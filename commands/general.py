@@ -100,7 +100,7 @@ class CmdSay(Command):
             return
 
         self.msg("|gVous dites|n : {}".format(message))
-        caller.location.msg_contents("|g{who} dit|n : {what}", exclude=[self], mapping=dict(who=caller, what=message))
+        caller.location.msg_contents("|g{who} dit|n : {what}", exclude=[caller], mapping=dict(who=caller, what=message))
 
 
 class CmdTell(Command):
